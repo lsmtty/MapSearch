@@ -1,0 +1,47 @@
+<style lang="less">
+  .userinfo {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .userinfo-avatar {
+    width: 128rpx;
+    height: 128rpx;
+    margin: 20rpx;
+    border-radius: 50%;
+  }
+
+  .userinfo-nickname {
+    color: #aaa;
+  }
+
+  .usermotto {
+    margin-top: 200px;
+    border:1rpx solid #e8e8e8;
+  }
+</style>
+<template>
+  <view class="container">
+    <view class="usermotto" @tap='enterMap'>
+      <text class="user-motto">{{motto}}</text>
+    </view>
+  </view>
+</template>
+<script>
+  import wepy from 'wepy'
+  export default class MapIndex extends  wepy.page{
+    data = {
+      motto: '进入地图'
+    }
+    methods = {
+      enterMap:function(){
+        wepy.navigateTo({
+          url: 'MapSearch',
+        })
+      }
+    }
+    onLoad() {
+    }
+  }
+</script>

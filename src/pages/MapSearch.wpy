@@ -1,0 +1,210 @@
+<style lang="less">
+  .map_container{
+    height: 80vh;
+    width: 100%;
+  }
+  .map {
+    height: 100%;
+    width: 100%;
+  }
+  .search_type_list{
+    font-size:36rpx;
+    padding:10rpx 10rpx;
+    width:100%;
+    overflow-x:scroll;
+    white-space:nowrap;
+    .search_item{
+      margin-right: 10rpx;
+      display: inline-block;
+      background:deepskyblue;
+      &:active{
+       }
+    }
+  }
+  .place_info{
+    font-size:24rpx;
+  }
+</style>
+<template>
+  <view class="map_container">
+    <map class="map" id="myMap" latitude="{{latitude}}" longitude="{{longitude}}" scale="16" show-location="true" markers="{{markers}}" @markertap="makertap" @regionchange="regionchange"></map>
+  </view>
+  <scroll-view class="search_type_list" scroll-x>
+    <view class="search_item" scroll-left="100" @tap="handleSearchItem({{index}})" wx:for="{{searchType}}" wx:key="{{index}}" wx:item="{{item}}">{{item}}</view>
+  </scroll-view>
+  <view class="place_info">
+    <text>{{placeData.title}}</text>
+    <text>{{placeData.address}}</text>
+    <text>{{placeData.telephone}}</text>
+  </view>
+</template>
+<script>
+  import wepy from 'wepy';
+  import bmap from 'Lib/bmap-wx.js';
+  let wxMarkerData = [];
+  export default class MapSearch extends wepy.page{
+    config = {
+      navigationBarTitleText: '房源检索',
+      enablePullDownRefresh: false,
+      backgroundTextStyle: 'dark',
+      backgroundColor:'#F8F8F8'
+    }
+    data = {
+      markers: [],
+      bmapObject:'',
+      mapContext:'',
+      searchType:["酒店","地铁","美食","汽车站","电影","超市","ktv","网咖","健身房","游泳馆","商场","写字楼","学校","医院","药店"],
+      placeData: {},
+      latitude:'40.2124407183',
+      longitude:'116.2353515625', //避免触发循环引用的问题
+      touchChangeRegion:false,//用户主动出发的地图修改，不需要再去获取中心坐标，避免死循环，
+      currentSearchIndex:1,
+      searchPageSize:20,
+      mapData:{
+        centerLocation:{
+          latitude:'40.2124407183',
+          longitude:'116.2353515625'
+        },
+        regionData:{
+          northeast:{
+            latitude:'',
+            longitude:''
+          },
+          southwest:{
+            latitude:'',
+            longitude:''
+          }
+        },
+        scale:14
+      }
+    }
+
+    methods = {
+      handleSearchItem:function (index) {
+        let _this = this;
+        _this.currentSearchIndex = index;
+        _this.search(index);
+      }
+    }
+
+    onLoad() {
+      this.searchSuccess = this.searchSuccess.bind(this);
+      this.searchFail = this.searchFail.bind(this);
+      let _this = this;
+      // 新建百度地图对象
+      _this.bmapObject = new bmap.BMapWX({
+        ak: _this.$parent.globalData.baiduMapAk
+      });
+      //获取全局的地图上下文
+      _this.mapContext = wepy.createMapContext('myMap',_this);
+      _this.search(); //预展示
+    }
+    makertap(e) {
+      let id = e.markerId;
+      this.showSearchInfo(wxMarkerData, id);
+      this.changeMarkerColor(wxMarkerData, id);
+      this.changeRegion(wxMarkerData, id);
+    }
+
+    /**
+     * 关键词搜索
+     * @param queryIndex
+     */
+    search(queryIndex){
+      // 发起POI检索请求
+      let _this = this;
+      if(!queryIndex) queryIndex = _this.currentSearchIndex;
+      _this.bmapObject.search({
+        "query": _this.searchType[queryIndex],
+        fail: _this.searchFail,
+        location:_this.mapData.centerLocation.latitude + "," + _this.mapData.centerLocation.longitude,
+        page_size:_this.searchPageSize,
+        success: _this.searchSuccess,
+        // 此处需要在相应路径放置图片文件
+        iconPath: '../../img/marker_red.png',
+        // 此处需要在相应路径放置图片文件
+        iconTapPath: '../../img/marker_red.png'
+      });
+    }
+    searchSuccess(data){
+      let _this = this;
+      if(!data.wxMarkerData.length){ return}
+      wxMarkerData = data.wxMarkerData;
+      _this.markers = wxMarkerData;
+      /*_this.mapData.centerLocation.latitude = wxMarkerData[0].latitude;
+      _this.mapData.centerLocation.longitude = wxMarkerData[0].longitude;*/
+      _this.$apply();
+    }
+    searchFail(data){
+      console.log(data)
+    }
+    changeRegion(data,i){
+      let _this = this;
+      _this.latitude = data[i].latitude;
+      _this.longitude = data[i].longitude;
+    }
+
+    /**
+     * 展示锚点结果
+     * @param data 锚点数据
+     * @param i    锚点index
+     */
+    showSearchInfo(data, i) {
+      let _this = this;
+      _this.placeData =  {
+        title: '名称：' + data[i].title + '\n',
+        address: '地址：' + data[i].address + '\n',
+        telephone: '电话：' + ( data[i].telephone || '暂无')
+      };
+      _this.$apply();
+    }
+
+    /**
+     * 锚点图片选中切换
+     * @param data
+     * @param i
+     */
+    changeMarkerColor(data, i) {
+      let _this = this;
+      let markers = [];
+      for (let j = 0; j < data.length; j++) {
+        if (j == i) {
+          // 此处需要在相应路径放置图片文件
+          data[j].iconPath = "../../img/marker_yellow.png";
+        } else {
+          // 此处需要在相应路径放置图片文件
+          data[j].iconPath = "../../img/marker_red.png";
+        }
+        markers[j] = data[j] ;
+      }
+      _this.markers = markers;
+      _this.$apply();
+    }
+
+    /**
+     * 视野改变回调
+     * @param res
+     */
+    regionchange(res){
+      let _this = this;
+      _this.mapContext.getCenterLocation({
+        success:function (res) {
+          _this.mapData.centerLocation.latitude = res.latitude;
+          _this.mapData.centerLocation.longitude = res.longitude;
+          _this.search();
+        }
+      })
+      _this.mapContext.getRegion({
+        success:function (res) {
+          _this.mapData.regionData.northeast = res.northeast;
+          _this.mapData.regionData.southwest = res.southwest;
+        }
+      })
+      _this.mapContext.getScale({
+        success:function (res) {
+          _this.mapData.scale  = res.scale;
+        }
+      })
+    }
+  }
+</script>
